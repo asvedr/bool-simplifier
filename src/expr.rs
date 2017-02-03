@@ -19,9 +19,9 @@ pub struct Op {
 #[macro_export]
 macro_rules! var {($name:expr) => {Rc::new(Expr::Var($name))} }
 #[macro_export]
-macro_rules! cnd {($cnd:expr, $th:expr, $el:expr)=> {Rc::new(Expr::If($cnd, $th, $el))}}
+macro_rules! cnd {($cnd:expr, $th:expr, $el:expr) => {Rc::new(Expr::If($cnd, $th, $el))}}
 #[macro_export]
-macro_rules! bin {($op:expr, $a:expr, $b:expr)=> {Rc::new(Expr::Bin($a, $b, $op))}}
+macro_rules! bin {($op:expr, $a:expr, $b:expr) => {Rc::new(Expr::Bin($a, $b, $op))}}
 #[macro_export]
 macro_rules! not {($name:expr) => {Rc::new(Expr::Not($name))} }
 #[macro_export]
@@ -38,6 +38,31 @@ impl Op {
 }
 
 impl Expr {
+    #[inline(always)]
+    pub fn height(&self) -> usize {
+        // XXX THINK ABOUT FAST HEIGHT CALCULATION
+        // MAYBE USE CACHE AND UPD FUNCTION
+        match *self {
+            Expr::Bin(ref a, ref b,_) => {
+                let a = a.height();
+                let b = b.height();
+            },
+            Expr::If(ref a, ref b, ref c) => {
+                let a = a.height();
+                let b = b.height();
+                let c = c.height();
+                if a < b {
+                    a = b;
+                }
+                if a > c {
+                    a
+                } else {
+                    c
+                }
+            },
+            _ => 1
+        }
+    }
     pub fn to_str(&self) -> String {
         match *self {
             Expr::Var(ref n) => n.to_string(),
