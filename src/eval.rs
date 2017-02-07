@@ -1,78 +1,47 @@
 use expr::*;
 use std::fmt::Write;
-use std::collections::BTreeSet;
+pub use std::collections::BTreeSet;
 
-pub struct Evaluator {
-    vars    : Vec<char>,
-    val_tbl : Vec<BTreeSet<char>>
+pub type Values = BTreeSet<char>;
+pub struct Diapason {
+    pub vars    : Vec<char>,
+    pub val_tbl : Vec<Values>
 }
 
-enum Cmd<'a> {
-    Val(bool),
-    Not,
-    Fun(&'a Fn(bool,bool) -> bool)
-}
+// defined pub eval(&Expr,&Values) -> bool
+// defined pub get_vars(&Expr) -> Vec<char>
 
-impl Evaluator {
-    pub fn new(expr : &Expr) -> Evaluator {
+impl Diapason {
+    pub fn from_expr(expr : &Expr) -> Diapason {
         let vars = get_vars(expr);
         let tbl = gen_tbl(&vars);
-        Evaluator {
+        Diapason {
             vars    : vars,
             val_tbl : tbl
         }
     }
-    pub fn eval(&self, expr : &Expr, set_num : usize) -> bool {
-        let set = &self.val_tbl[set_num];
-        let mut stack = vec![expr];
-        let mut eval = vec![];
-        while let Some(e) = stack.pop() {
-            match *e {
-                Expr::Var(ref n) => eval.push(Cmd::Val(set.contains(n))),
-                Expr::Not(ref e) => {
-                    eval.push(Cmd::Not);
-                    stack.push(e);
-                },
-                Expr::Bin(ref a, ref b, ref o) => {
-                    eval.push(Cmd::Fun(&*o.func));
-                    stack.push(b);
-                    stack.push(a);
-                },
-                Expr::If(ref c, ref t, ref e) => {
-                    if self.eval(&**c, set_num) {
-                        stack.push(t);
-                    } else {
-                        stack.push(e);
-                    }
-                },
-                Expr::Val(ref b) => {
-                    if *b {
-                        eval.push(Cmd::Val(true));
-                    } else {
-                        eval.push(Cmd::Val(true));
-                    }
-                }
+    pub fn new(vars : Vec<char>) -> Diapason {
+        let tbl = gen_tbl(&vars);
+        Diapason {
+            vars    : vars,
+            val_tbl : tbl
+        }
+    }
+    pub fn table_for(&self, expr : &Expr) -> Vec<bool> {
+        let mut acc = vec![];
+        acc.reserve(self.val_tbl.len());
+        for vals in self.val_tbl.iter() {
+            acc.push(eval(expr, vals));
+        }
+        acc
+    }
+    pub fn cmp_with_table(&self, expr : &Expr, tbl : &Vec<bool>) -> bool {
+        for i in 0 .. self.val_tbl.len() {
+            if eval(expr, &self.val_tbl[i]) != tbl[i] {
+                return false
             }
         }
-        let mut stack = vec![];
-        while let Some(e) = eval.pop() {
-            match e {
-                Cmd::Val(b) => stack.push(b),
-                Cmd::Not => {
-                    let a = stack[0];
-                    stack.pop();
-                    stack.push(!a)
-                },
-                Cmd::Fun(f) => {
-                    let a = stack[0];
-                    stack.pop();
-                    let b = stack[0];
-                    stack.pop();
-                    stack.push(f(a,b));
-                }
-            }
-        }
-        return stack[0];
+        true
     }
     pub fn print(&self, expr : Option<&Expr>) {
         let mut line = format!("|");
@@ -100,7 +69,7 @@ impl Evaluator {
             }
             match expr {
                 Some(ref e) => {
-                    let _ = write!(line, "{}|", if self.eval(e, i) {'1'} else {'0'});
+                    let _ = write!(line, "{}|", if eval(e, &self.val_tbl[i]) {'1'} else {'0'});
                     //write!(line, 
                 },
                 _ => ()
@@ -108,10 +77,82 @@ impl Evaluator {
             println!("{}",line);
         }
     }
+    pub fn is_eq(&self, a : &Expr, b : &Expr) -> bool {
+        for vals in self.val_tbl.iter() {
+            if eval(a, vals) != eval(b, vals) {
+                return false;
+            }
+        }
+        true
+    }
 }
 
-fn get_vars(expr : &Expr) -> Vec<char> {
-    let mut set : BTreeSet<char> = BTreeSet::new();
+enum Cmd<'a> {
+    Val(bool),
+    Not,
+    Fun(&'a Fn(bool,bool) -> bool)
+}
+
+pub fn eval(expr : &Expr, set : &Values) -> bool {
+    //let set = &self.val_tbl[set_num];
+    let mut stack = vec![expr];
+    let mut eval_s = vec![];
+    let mut log_s = vec![];
+    macro_rules! epush {($c:expr, $l:expr) => {{
+        eval_s.push($c);
+        log_s.push($l.to_string());
+    }};}
+    while let Some(e) = stack.pop() {
+        match *e {
+            Expr::Var(ref n) => epush!(Cmd::Val(set.contains(n)), n),
+            Expr::Not(ref e) => {
+                epush!(Cmd::Not, "!");
+                stack.push(e);
+            },
+            Expr::Bin(ref a, ref b, ref o) => {
+                epush!(Cmd::Fun(&*o.func), o.name);
+                stack.push(b);
+                stack.push(a);
+            },
+            Expr::If(ref c, ref t, ref e) => {
+                if eval(&**c, set) {
+                    stack.push(t);
+                } else {
+                    stack.push(e);
+                }
+            },
+            Expr::Val(ref b) => {
+                if *b {
+                    epush!(Cmd::Val(true), 'T');
+                } else {
+                    epush!(Cmd::Val(false), 'F');
+                }
+            }
+        }
+    }
+    //println!("{:?}", log_s);
+    let mut stack = vec![];
+    while let Some(e) = eval_s.pop() {
+        match e {
+            Cmd::Val(b) => stack.push(b),
+            Cmd::Not => {
+                let a = stack[0];
+                stack.pop();
+                stack.push(!a)
+            },
+            Cmd::Fun(f) => {
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(f(a,b));
+            }
+        }
+    }
+    //println!("{:?}", stack);
+    return stack[0];
+}
+
+pub fn get_vars(expr : &Expr) -> Vec<char> {
+    let mut set : Values = BTreeSet::new();
     let mut stack : Vec<&Expr> = vec![expr];
     while let Some(val) = stack.pop() {
         match *val {
@@ -134,7 +175,7 @@ fn get_vars(expr : &Expr) -> Vec<char> {
     return set.into_iter().collect();
 }
 
-fn gen_tbl(vars : &Vec<char>) -> Vec<BTreeSet<char>> {
+fn gen_tbl(vars : &Vec<char>) -> Vec<Values> {
     let mut old = vec![BTreeSet::new()];
     let mut new = vec![];
     for v in vars.iter() {

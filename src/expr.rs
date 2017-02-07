@@ -1,7 +1,7 @@
 pub use std::rc::Rc;
 use reserr::*;
 
-pub type RExpr = Rc<Expr>;
+pub type RExpr = Box<Expr>;
 pub type ROp = Rc<Op>;
 pub enum Expr {
     Var(char),
@@ -17,15 +17,17 @@ pub struct Op {
 }
 
 #[macro_export]
-macro_rules! var {($name:expr) => {Rc::new(Expr::Var($name))} }
+macro_rules! lnk{($a:expr) => (Box::new($a))}
 #[macro_export]
-macro_rules! cnd {($cnd:expr, $th:expr, $el:expr) => {Rc::new(Expr::If($cnd, $th, $el))}}
+macro_rules! var {($name:expr) => {lnk!(Expr::Var($name))} }
 #[macro_export]
-macro_rules! bin {($op:expr, $a:expr, $b:expr) => {Rc::new(Expr::Bin($a, $b, $op))}}
+macro_rules! cnd {($cnd:expr, $th:expr, $el:expr) => {lnk!(Expr::If($cnd, $th, $el))}}
 #[macro_export]
-macro_rules! not {($name:expr) => {Rc::new(Expr::Not($name))} }
+macro_rules! bin {($op:expr, $a:expr, $b:expr) => {lnk!(Expr::Bin($a, $b, $op))}}
 #[macro_export]
-macro_rules! val {($name:expr) => {Rc::new(Expr::Val($name))} }
+macro_rules! not {($name:expr) => {lnk!(Expr::Not($name))} }
+#[macro_export]
+macro_rules! val {($name:expr) => {lnk!(Expr::Val($name))} }
 
 impl Op {
     pub fn new(code : char, name : &str, f : Box<Fn(bool,bool) -> bool>) -> ROp {
@@ -46,9 +48,14 @@ impl Expr {
             Expr::Bin(ref a, ref b,_) => {
                 let a = a.height();
                 let b = b.height();
+                if a > b {
+                    a
+                } else {
+                    b
+                }
             },
             Expr::If(ref a, ref b, ref c) => {
-                let a = a.height();
+                let mut a = a.height();
                 let b = b.height();
                 let c = c.height();
                 if a < b {

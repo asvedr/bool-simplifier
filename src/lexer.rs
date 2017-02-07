@@ -37,32 +37,6 @@ pub enum LexTP {
 	NSpace,		// ok q
 }
 
-/*
-impl LexTP {
-	pub fn to_string(&self) -> String {
-		format!("{:?}", self)
-	}
-}
-*/
-
-/*
-// this struct don't used in this module but using in others
-#[derive(Debug,Clone)]
-pub struct Lexem {
-	pub val  : String,
-	pub kind : LexTP
-}
-
-impl LexRes {
-	pub fn compare_with(&self, lexem : &Lexem) -> bool {
-		if self.kind == lexem.kind
-			{ return self.val == lexem.val }
-		else
-			{ return false }
-	}
-}
-*/
-
 // return lex err
 macro_rules! lexerr {
 	($l:expr, $c:expr, $d:expr) => { return Err(LexErr{line : $l, column : $c, data: $d.to_string()}) };
@@ -119,7 +93,7 @@ impl Lexer {
 	// create lexer from text
 	pub fn new(src : &str) -> Lexer {
 		// alphabets
-		let ops     : Vec<char> = ("+-*/=<>?!\\@%$^&").chars().collect();
+		let ops     : Vec<char> = ("+|-*/=<>?!\\@%$^&").chars().collect();
 		let sings   : Vec<char> = (".,;~").chars().collect();
 		let brs     : Vec<char> = ("()[]{}").chars().collect();
 		let slashed : Vec<char> = ("nt\\'\"").chars().collect();
