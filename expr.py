@@ -12,101 +12,97 @@
 # Copyright 2006, by Paul McGuire
 # Updated 2013-Sep-14 - improved Python 2/3 cross-compatibility
 #
-from pyparsing import infixNotation, opAssoc, Keyword, Word, alphas
+from pyparsing import Word, Literal, Forward, ZeroOrMore, Group
 
-# define classes to be built at parse time, as each matching
-# expression type is parsed
-class BoolOperand(object):
-    def __init__(self,t):
-        self.label = t
-        self.value = eval(t[0])
-    def __str__(self):
-        return self.label
+class Var:
+    def __init__(self, name):
+        self.name = name
     def __repr__(self):
-        return self.__str__()
+        return '$' + self.name
 
-class BoolBinOp(object):
-    def __init__(self,t):
-        self.args = t[0][0::2]
-    def __str__(self):
-        #sep = " %s " % self.reprsymbol
-        #return "(" + sep.join(map(str,self.args)) + ")"
-        return '(%s %s %s)' % (self.symbol, *self.args)
+class Not:
+    def __init__(self,expr):
+        self.expr = expr
     def __repr__(self):
-        return self.__str__()
+        return '~%s' % repr(self.expr)
 
-class Cond(object):
-    def __init__(self,t):
-        self.args = t[0][0::2]
-    def __str__(self):
-        return 'if(%s) {%s} {%s}' % self.args
+class Bin:
+    def __init__(self,f,a,b):
+        self.fun = f
+        self.a = a
+        self.b = b
     def __repr__(self):
-        return self.__str__()
+        return '(%s %s %s)' % (repr(self.a), self.fun, repr(self.b))
 
-class BoolAnd(BoolBinOp):
-    symbol = '&&'
-
-class BoolOr(BoolBinOp):
-    symbol = '||'
-
-class BoolEq(BoolBinOp):
-    symbol = '=='
-
-class BoolXor(BoolBinOp):
-    symbol = '!='
-
-class BoolNot(object):
-    def __init__(self,t):
-        self.arg = t[0][1]
-    def __bool__(self):
-        v = bool(self.arg)
-        return not v
-    def __str__(self):
-        return "!" + str(self.arg)
+class Cond:
+    def __init__(self,c,a,b):
+        self.cond = c
+        self.yes = a
+        self.no = b
     def __repr__(self):
-        return self.__str__()
+        return 'if {%s} {%s} {%s}' % (repr(self.cond), repr(self.yes), repr(self.no))
 
-TRUE = Keyword("True")
-FALSE = Keyword("False")
-boolOperand = TRUE | FALSE | Word(alphas,max=1)
-boolOperand.setParseAction(BoolOperand)
+class Parser:
+    def pushVar(self,a):
+        self.vstack.append(Var(a[0]))
+        self.binpop()
+    def pushVal(self,a):
+        self.vstack.append(a[0] == 'true')
+        self.binpop()
+    def pushNot(self,a):
+        #print('n')
+        self.vstack[-1] = Not(self.vstack[-1])
+        self.binpop()
+    def pushCond(self,_):
+        e = self.vstack.pop()
+        t = self.vstack.pop()
+        c = self.vstack.pop()
+        self.vstack.append(Cond(c,t,e))
+    def pushBin(self,a):
+        self.binval = a[0]
+    def blockIn(self,_):
+        #print('b-in')
+        self.bstack.append((self.vstack,self.binval))
+        self.vstack = []
+    def blockOut(self,_):
+        #print('b-out')
+        (vstack,binv) = self.bstack.pop()
+        vstack.append(self.vstack[0])
+        self.vstack = vstack
+        self.binval = binv
+        self.binpop()
+    def binpop(self):
+        if self.binval is None:
+            pass
+        else:
+            r = self.vstack.pop()
+            l = self.vstack.pop()
+            self.vstack.append(Bin(self.binval, l, r))
+            self.binval = None
+    def __init__(self):
+        self.vstack = []
+        self.bstack = []
+        self.binval = None
+        var = Word('ABCDEFGHIJKLMNOPQRSTUVWXYZ').setParseAction(self.pushVar)
+        val = (Word('false') | Word('true')).setParseAction(self.pushVal)
+        _lp = Literal('(').suppress().setParseAction(self.blockIn)
+        _rp = Literal(')').suppress().setParseAction(self.blockOut)
+        _lr = Literal('{').suppress()
+        _rr = Literal('}').suppress()
+        expr = Forward()
+        func = (Literal('&&') | Literal('||') | Literal('==') | Literal('!=')).setParseAction(self.pushBin)
+        _if = Literal('if').suppress()
+        cond = Group(_if + _lr + expr + _rr + _lr + expr + _rr + _lr + expr + _rr).setParseAction(self.pushCond)
+        nsym = Literal('~')
+        fnot = (Group(nsym + var) | Group(nsym + val) | Group(nsym + _lp + expr + _rp)).setParseAction(self.pushNot)
+        atom = (var | val | fnot | Group(_lp + expr + _rp) | cond)
+        expr <<= (atom + ZeroOrMore(func + expr))
+        self._expr = expr
+    def parse(self,text):
+        self.vstack = []
+        self.bstack = []
+        self.binval = None
+        self._expr.parseString(text)
+        return self.vstack[0]
 
-# define expression, based on expression operand and
-# list of operations in precedence order
-boolExpr = infixNotation( boolOperand,
-    [
-        ("!",  1, opAssoc.RIGHT, BoolNot),
-        ("&&", 2, opAssoc.LEFT,  BoolAnd),
-        ("||", 2, opAssoc.LEFT,  BoolOr),
-        ("==", 2, opAssoc.LEFT,  BoolEq),
-        ("!=", 2, opAssoc.LEFT,  BoolXor)
-    ])
-
-
-if __name__ == "__main__":
-    p = True
-    q = False
-    r = True
-    tests = ["p",
-             "q",
-             "p && q",
-             "p && !q", 
-             "!!p", 
-             "!(p && q)", 
-             "q || !p &&r", 
-             "q || !p || !r", 
-             "q || !(p && r)", 
-             "p || q || r", 
-             "p || q || r && False", 
-             "(p || q || r) && False", 
-            ]
-
-    print("p =", p)
-    print("q =", q)
-    print("r =", r)
-    for t in tests:
-        res = boolExpr.parseString(t)
-        print(str(res))
-        #success = "PASS" if bool(res) == expected else "FAIL"
-        #print (t,'\n', res, '=', bool(res),'\n', success, '\n')
-
+parser = Parser()
