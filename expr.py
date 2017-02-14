@@ -1,17 +1,3 @@
-#
-# simpleBool.py
-#
-# Example of defining a boolean logic parser using
-# the operatorGrammar helper method in pyparsing.
-#
-# In this example, parse actions associated with each
-# operator expression will "compile" the expression
-# into BoolXXX class instances, which can then
-# later be evaluated for their boolean value.
-#
-# Copyright 2006, by Paul McGuire
-# Updated 2013-Sep-14 - improved Python 2/3 cross-compatibility
-#
 from pyparsing import Word, Literal, Forward, ZeroOrMore, Group
 
 class Var:
