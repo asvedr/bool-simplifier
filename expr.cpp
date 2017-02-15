@@ -1,8 +1,11 @@
+/*
 #include <string>
 #include <vector>
 #include <sstream>
 #include <unordered_set>
 #include <cmath>
+*/
+#include "expr.h"
 
 /*
  * void  init_funs();
@@ -13,6 +16,7 @@
 
 using namespace std;
 
+/*
 struct Expr {
 	union {
 		struct {
@@ -29,26 +33,32 @@ struct Expr {
 #define VAR 0
 #define NOT 1
 #define BIN 2
+*/
 
 typedef bool(*BinFun)(bool,bool);
+/*
 struct Table {
 	vector<bool> values;
 	int          var_count;
 	string       res_str;
 	history      unordered_set<string>;
 }
+typedef vector<bool> Env;
+typedef vector<Env*> EnvSet;
+*/
 
-extern "C" Table* new_state(int* tbl, int var_cnt) {
+extern "C" Table* new_state(int* tbl_src, int var_cnt) {
 	Table* tbl = new Table;
 	int tbl_len = pow(2, var_cnt);
 	tbl -> values.reserve(tbl_len);
 	for(int i=0; i<tbl_len; ++i) {
-		tbl -> values.push_back(tbl[i]);
+		tbl -> values.push_back(tbl_src[i]);
 	}
 	tbl -> var_count = var_cnt;
+	return tbl;
 }
 
-extern "C" delete_state(Table* t) {
+extern "C" void delete_state(Table* t) {
 	delete t;
 }
 
@@ -56,7 +66,7 @@ extern "C" delete_state(Table* t) {
 #define RAND rand
 
 BinFun funs[FUN_CNT];
-char* fun_names[FUN_CNT];
+const char* fun_names[FUN_CNT];
 
 static bool f_and(bool a, bool b) {
 	return a && b;
@@ -69,6 +79,18 @@ static bool f_eq(bool a, bool b) {
 }
 static bool f_neq(bool a, bool b) {
 	return a != b;
+}
+
+bool eval(Expr* expr, Env* env) {
+	switch(expr -> type) {
+		case VAR:
+			return (*env)[expr -> var];
+		case NOT:
+			return !eval(expr -> not_expr, env);
+		case BIN:
+			return funs[expr -> bin_call.opr](eval(expr -> bin_call.left, env), eval(expr -> bin_call.right, env));
+	}
+	return false;
 }
 
 // function for call in PY
@@ -112,9 +134,10 @@ inline static void expr_hash(Expr* expr, string &out) {
 	out.clear();
 	vector<Expr*> stack;
 	stack.push_back(expr);
-	while(!stack.is_empty()) {
-		expr = stack.pop_back();
-		switch(expr.type) {
+	while(!stack.empty()) {
+		expr = stack.back();
+		stack.pop_back();
+		switch(expr -> type) {
 			case VAR:
 				out.push_back('v');
 				out.push_back((char)expr -> var);
@@ -138,17 +161,19 @@ inline static void expr_str(Expr* expr, string &out) {
 	stringstream ss;
 	vector<Expr*> stack;
 	stack.push_back(expr);
-	while(!stack.is_empty()) {
-		expr = stack.pop_back();
-		switch(expr.type) {
+	while(!stack.empty()) {
+		expr = stack.back();
+		stack.pop_back();
+		switch(expr -> type) {
 			case VAR:
 				ss << "VAR " << expr -> var << " ";
 			break;
 			case NOT:
-				ss << "NOT " << stack.push_back(expr -> not_expr) << " ";
+				ss << "NOT ";
+				stack.push_back(expr -> not_expr);
 			break;
 			case BIN:
-				ss << "BIN " << op_names[expr -> bin_call.opr] << " ";
+				ss << "BIN " << fun_names[expr -> bin_call.opr] << " ";
 				stack.push_back(expr -> bin_call.left);
 				stack.push_back(expr -> bin_call.right);
 			break;
@@ -157,6 +182,25 @@ inline static void expr_str(Expr* expr, string &out) {
 	out = ss.str();
 }
 
+static EnvSet* getEnvs(int vcount) {
+	EnvSet buf;
+	EnvSet *acc = new vector<Env*>();
+	acc -> push_back(new vector<bool>());
+	for(int var = 0; var < vcount; ++var) {
+		buf.clear();
+		for(auto env = acc -> begin(); env != acc -> end(); ++env) {
+			Env* alternate = new vector<bool>(**env);
+			alternate -> push_back(false);
+			(*env) -> push_back(true);
+			buf.push_back(alternate);
+		}
+		for(auto env = buf.begin(); env != buf.end(); ++env) {
+			acc -> push_back(*env);
+		}
+	}
+	return acc;
+}
+
 extern "C" char* find_analog(Table* tbl) {
-	
+	return NULL;
 }
