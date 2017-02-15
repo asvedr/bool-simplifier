@@ -120,7 +120,7 @@ class Parser:
         _if = Literal('if').suppress()
         cond = Group(_if + _lr + expr + _rr + _lr + expr + _rr + _lr + expr + _rr).setParseAction(self.pushCond)
         nsym = Literal('~').setParseAction(self.dumpNot)
-        fnot = (Group(nsym + var) | Group(nsym + val) | Group(nsym + _lp + expr + _rp)).setParseAction(self.pushNot)
+        fnot = (nsym + (Group(var) | Group(val) | Group(_lp + expr + _rp))).setParseAction(self.pushNot)
         atom = (var | val | fnot | Group(_lp + expr + _rp) | cond)
         expr <<= (atom + ZeroOrMore(func + expr))
         self._expr = expr
