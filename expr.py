@@ -1,4 +1,4 @@
-from pyparsing import Word, Literal, Forward, ZeroOrMore, Group
+from pyparsing import Word, Literal, Forward, ZeroOrMore, Group, Regex
 from functools import reduce
 
 # Expr items: Var, Not, Bin, Cond, bool
@@ -15,7 +15,13 @@ class Var:
     def __str__(self):
         return self.name
     def eval(self,env):
-        return env[self.name]
+        try:
+            return env[self.name]
+        except:
+            return True
+    def replace(self,pairs):
+        if self.name in pairs:
+            self.name = pairs[self.name]
 
 class Not:
     def __init__(self,expr):
@@ -26,6 +32,8 @@ class Not:
         return '~' + str(self.expr)
     def eval(self,env):
         return not self.expr.eval(env)
+    def replace(self,pairs):
+        self.expr.replace(pairs)
 
 class Bin:
     def __init__(self,f,call,a,b):
@@ -41,6 +49,9 @@ class Bin:
         a = self.a.eval(env)
         b = self.b.eval(env)
         return self.call(a,b)
+    def replace(self,pairs):
+        self.a.replace(pairs)
+        self.b.replace(pairs)
 
 class Cond:
     def __init__(self,c,a,b):
@@ -56,6 +67,10 @@ class Cond:
             return self.yes.eval(env)
         else:
             return self.no.eval(env)
+    def replace(self,pairs):
+        self.cond.replace(pairs)
+        self.yes.replace(pairs)
+        self.no.replace(pairs)
 
 class Parser:
     funs = {
@@ -85,12 +100,10 @@ class Parser:
     def pushBin(self,a):
         self.binval = a[0]
     def blockIn(self,_):
-        #print('b-in')
         self.bstack.append((self.vstack, self.binval))
         self.binval = None
         self.vstack = []
     def blockOut(self,_):
-        #print('b-out')
         (vstack,binv) = self.bstack.pop()
         vstack.append(self.vstack[0])
         self.vstack = vstack
@@ -108,7 +121,9 @@ class Parser:
         self.vstack = []
         self.bstack = []
         self.binval = None
-        var = Word('ABCDEFGHIJKLMNOPQRSTUVWXYZ').setParseAction(self.pushVar)
+        #var_name = Word('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+        #var_num  = Word('1234567890')
+        var = Regex('[A-Z][A-Z0-9]*').setParseAction(self.pushVar)
         val = (Word('false') | Word('true')).setParseAction(self.pushVal)
         _lp = Literal('(').suppress().setParseAction(self.blockIn)
         _rp = Literal(')').suppress().setParseAction(self.blockOut)
@@ -149,7 +164,9 @@ def getAllVars(expr):
             stack.append(e.cond)
             stack.append(e.yes)
             stack.append(e.no)
-    return list(acc)
+    acc = list(acc)
+    acc.sort()
+    return acc
 
 def makeTbl(expr,vnames):
     envs = [{}]
@@ -193,4 +210,6 @@ def splitByUsing(expr, envs, names):
             used.append(v)
         else:
             unused.append(v)
+    used.sort()
+    unused.sort()
     return (used,unused)

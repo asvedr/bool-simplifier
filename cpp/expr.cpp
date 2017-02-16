@@ -11,47 +11,18 @@
  * void  init_funs();
  * void* new_state(int*, int); - (values, var_count) -> new_state
  * void  delete_state(void*); - clear memory from state
- * char* find_analog(void*) - calculate analog and return as string. after result you should delete_state
  */
 
 using namespace std;
 
-/*
-struct Expr {
-	union {
-		struct {
-			Expr *left;
-			Expr *right;
-			int opr; // 0 .. 127
-		} bin_call;
-		Expr *not_expr;
-		int var; // 0 .. 127
-	}
-	char type;
-	char depth;
-};
-#define VAR 0
-#define NOT 1
-#define BIN 2
-*/
-
 typedef bool(*BinFun)(bool,bool);
-/*
-struct Table {
-	vector<bool> values;
-	int          var_count;
-	string       res_str;
-	history      unordered_set<string>;
-}
-typedef vector<bool> Env;
-typedef vector<Env*> EnvSet;
-*/
 
 extern "C" Table* new_state(int* tbl_src, int var_cnt) {
 	Table* tbl = new Table;
 	int tbl_len = pow(2, var_cnt);
 	tbl -> values.reserve(tbl_len);
-	for(int i=0; i<tbl_len; ++i) {
+	//for(int i=0; i<tbl_len; ++i) {
+	for(int i=tbl_len-1; i>=0; --i) {
 		tbl -> values.push_back(tbl_src[i]);
 	}
 	tbl -> var_count = var_cnt;
@@ -62,8 +33,7 @@ extern "C" void delete_state(Table* t) {
 	delete t;
 }
 
-#define FUN_CNT 4
-#define RAND rand
+//#define RAND rand
 
 BinFun funs[FUN_CNT];
 const char* fun_names[FUN_CNT];
@@ -105,32 +75,8 @@ extern "C" void init_funs() {
 	fun_names[3] = "!=";
 }
 
-inline static Expr* rand_combine(vector<Expr*> exprs) {
-	int op_id = RAND() % (FUN_CNT + 1);
-	if(op_id == 0) {
-		// NOT
-		Expr* e = exprs[RAND() % exprs.size()];
-		Expr* res = new Expr;
-		res -> type = NOT;
-		res -> depth = e -> depth + 1;
-		res -> not_expr = e;
-		return res;
-	} else {
-		// BIN OP
-		int func = op_id - 1;
-		Expr* a = exprs[RAND() % exprs.size()];
-		Expr* b = exprs[RAND() % exprs.size()];
-		Expr* res = new Expr;
-		res -> type = BIN;
-		res -> depth = a -> depth + b -> depth + 1;
-		res -> bin_call.left = a;
-		res -> bin_call.right = b;
-		res -> bin_call.opr = op_id;
-		return res;
-	}
-}
-
-inline static void expr_hash(Expr* expr, string &out) {
+/*
+void expr_hash(Expr* expr, string &out) {
 	out.clear();
 	vector<Expr*> stack;
 	stack.push_back(expr);
@@ -155,6 +101,7 @@ inline static void expr_hash(Expr* expr, string &out) {
 		} 
 	}
 }
+*/
 
 inline static void expr_str(Expr* expr, string &out) {
 	out.clear();
@@ -182,7 +129,50 @@ inline static void expr_str(Expr* expr, string &out) {
 	out = ss.str();
 }
 
-static EnvSet* getEnvs(int vcount) {
+static string show_expr_rec(Expr* e) {
+	stringstream ss;
+	string a;
+	string b;
+	const char* o;
+	switch(e -> type) {
+		case VAR:
+			ss << "V" << e -> var;
+			break;
+		case NOT:
+			ss << "~" << show_expr_rec(e -> not_expr);
+			break;
+		case BIN:
+			a = show_expr_rec(e -> bin_call.left);
+			b = show_expr_rec(e -> bin_call.right);
+			o = fun_names[e -> bin_call.opr];
+			ss << "(" << a << " " << o << " " << b << ")";
+			break;
+	}
+	return ss.str();
+}
+
+extern "C" const char* show_expr(Expr* e, Table* t) {
+	//expr_str(e, t -> res_str);
+	t -> res_str = show_expr_rec(e);
+	return t -> res_str.c_str();
+}
+
+/*
+extern "C" void* new_expr_view() {
+	return (void*)(new string());
+}
+
+extern "C" char* show_expr(Expr* e, void* view) {
+	expr_str(e, *(string*)view);
+	return view.s_str();
+}
+
+extern "C" void del_expr_view(void* view) {
+	delete (string*)view;
+}
+*/
+
+EnvSet* gen_env_set(int vcount) {
 	EnvSet buf;
 	EnvSet *acc = new vector<Env*>();
 	acc -> push_back(new vector<bool>());
@@ -201,6 +191,54 @@ static EnvSet* getEnvs(int vcount) {
 	return acc;
 }
 
-extern "C" char* find_analog(Table* tbl) {
-	return NULL;
+Expr* clone_expr(Expr* e) {
+	auto new_e = new Expr;
+	new_e -> type = e -> type;
+	new_e -> depth = e -> depth;
+	switch(e -> type) {
+		case VAR:
+			new_e -> var = e -> var;
+			break;
+		case NOT:
+			new_e -> not_expr = clone_expr(e -> not_expr);
+			break;
+		case BIN:
+			new_e -> bin_call.opr   = e -> bin_call.opr;
+			new_e -> bin_call.left  = clone_expr(e -> bin_call.left);
+			new_e -> bin_call.right = clone_expr(e -> bin_call.right);
+			break;
+	}
+	return new_e;
+}
+
+Expr* e_var(int v) {
+	Expr* e = new Expr;
+	e -> type = VAR;
+	e -> depth = 1;
+	e -> var = v;
+	return e;
+}
+
+Expr* e_not(Expr* chld) {
+	Expr* e = new Expr;
+	e -> type = NOT;
+	e -> depth = chld -> depth + 1;
+	e -> not_expr = chld;
+	return e;
+}
+
+Expr* e_bin(int op, Expr* a, Expr* b) {
+	Expr* e = new Expr;
+	e -> type = BIN;
+	e -> depth = a -> depth + b -> depth + 1;
+	e -> bin_call.left = a;
+	e -> bin_call.right = b;
+	e -> bin_call.opr = op;
+	return e;
+}
+
+string log_expr(Expr* e) {
+	string res;
+	expr_str(e, res);
+	return res;
 }
