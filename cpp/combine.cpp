@@ -36,25 +36,29 @@ inline static Expr* rand_combine(vector<Expr*> &exprs) {
 	return res;
 }
 
-static void check_tbl(Expr* e, EnvSet* envs, const vector<bool>* target, bool& target_match, bool& tautology, string& hash) {
+static void check_tbl(Expr* e, EnvSet* envs, const vector<bool>* target, bool& target_match, bool& tautology, int& hash) {
 	int i = 0;
 	bool ok = true;
 	bool all_t = true;
 	bool all_f = true;
+	hash = 0;
+	int p2 = 1;
 	for(Env* env : *envs) {
-		bool val = eval(e, env);
+		bool val = eval(e, env, NULL);
 		ok = ok && val == (*target)[i];
 		all_t = all_t && val;
 		all_f = all_f && !val;
-		hash[i] = (val)? '1': '0';
+		//hash[i] = (val)? '1': '0';
+		hash = hash | (p2 * val);
 		++i;
+		p2 *= 2;
 	}
 	target_match = ok;
 	tautology = all_t || all_f;
 }
 
 static Expr* finish(vector<Expr*>& variants, Expr* e) {
-	Expr* res = clone_expr(e);
+	Expr* res = clone_expr(e, NULL);
 	for(Expr* ptr : variants) {
 		//LOG("del", "finish");
 		delete ptr;
@@ -65,15 +69,15 @@ static Expr* finish(vector<Expr*>& variants, Expr* e) {
 extern "C" Expr* find_analog(Table* tbl, int iter_count, int max_depth) {
 	SRAND;
 	vector<Expr*> variants;
-	unordered_set<string> history;
+	unordered_set<int> history;
 	EnvSet* envs = gen_env_set(tbl -> var_count);
-	string hash;
+	int hash;
 	const vector<bool>* target = &tbl -> values;
 	bool is_target;
 	bool is_tautology;
-	for(int i=0; i<target -> size(); ++i) {
-		hash += '0';
-	}
+	//for(int i=0; i<target -> size(); ++i) {
+	//	hash += '0';
+	//}
 #define ADD_VAR(e) {\
 	variants.push_back(e);\
 	/*++v_size;*/\
@@ -104,9 +108,6 @@ extern "C" Expr* find_analog(Table* tbl, int iter_count, int max_depth) {
 		++v_size;\
 	}\
 }
-	//for(Expr* e : variants) {
-	//	cerr << "VAR: " << log_expr(e) << endl;
-	//}
 	while(iter_count > 0) {
 		LOG("loop","in");
 		if(RAND_BOOL) {
