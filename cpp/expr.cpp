@@ -242,3 +242,11 @@ string log_expr(Expr* e) {
 	expr_str(e, res);
 	return res;
 }
+
+extern "C" int expr_depth(Expr* e) {
+	return e -> depth;
+}
+
+extern "C" void delete_expr(Expr* e) {
+	delete e;
+}

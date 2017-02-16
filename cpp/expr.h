@@ -37,6 +37,8 @@ extern "C" void         init_funs(); // call before all
 extern "C" Table*       new_state(int*, int);
 extern "C" void         delete_state(Table*);
 extern "C" const char*  show_expr(Expr*,Table*);
+extern "C" int          expr_depth(Expr*);
+extern "C" void         delete_expr(Expr*);
 //extern "C" View   new_expr_view(); // to veiw in python
 //extern "C" char*  show_expr(Expr*, View); // to view in python
 //extern "C" void   del_expr_view(View); // to view in python

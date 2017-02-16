@@ -62,7 +62,7 @@ static Expr* finish(vector<Expr*>& variants, Expr* e) {
 	return res;
 }
 
-static Expr* find_analog_e(Table* tbl, int iter_count, int max_depth) {
+extern "C" Expr* find_analog(Table* tbl, int iter_count, int max_depth) {
 	SRAND;
 	vector<Expr*> variants;
 	unordered_set<string> history;
@@ -133,16 +133,4 @@ static Expr* find_analog_e(Table* tbl, int iter_count, int max_depth) {
 		--iter_count;
 	}
 	return NULL;
-}
-
-extern "C" const char* find_analog(Table* tbl, int iter_count, int max_depth) {
-	Expr* e = find_analog_e(tbl, iter_count, max_depth);
-	if(e == NULL) {
-		tbl -> res_str.clear();
-		return "";
-	} else {
-		auto res = show_expr(e, tbl);
-		delete e;
-		return res;
-	}
 }
