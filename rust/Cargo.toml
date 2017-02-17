@@ -5,7 +5,8 @@ authors = ["Arseny <asvedr@gmail.com>"]
 
 [dependencies]
 rand = "0.3"
+# libc = "0.2.20"
 
 [lib]
-name = "libsolver"
+name = "solver"
 crate-type = ["dylib"]

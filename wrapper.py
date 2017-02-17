@@ -1,6 +1,6 @@
 import cffi
 
-class Wrap:
+class CPPWrap:
     def __init__(self, path):
         ffi = cffi.FFI()
         ffi.cdef('void         init_funs();')
@@ -26,4 +26,26 @@ class Wrap:
         else:
             res = None
         lib.delete_state(tbl)
+        return res
+
+class RustWrap:
+    def __init__(self, path):
+        ffi = cffi.FFI()
+        ffi.cdef('void* get_expr(int,int*);')
+        ffi.cdef('char* show_expr(void*);')
+        ffi.cdef('void rem_expr(void*);')
+        self._lib = ffi.dlopen(path)
+        self._ffi = ffi
+    def findAnalog(self, boolTbl, varCnt, tryCount, maxDepth):
+        lib = self._lib
+        cBoolTbl = self._ffi.new("int[]", len(boolTbl))
+        rng = range(len(boolTbl))
+        for (i,j) in zip(rng, reversed(rng)):
+            cBoolTbl[j] = int(boolTbl[i])
+        ans = lib.get_expr(varCnt, cBoolTbl)
+        if ans:
+            res = self._ffi.string(lib.show_expr(ans)).decode('utf8')
+            lib.rem_expr(ans)
+        else:
+            res = None
         return res

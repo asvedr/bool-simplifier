@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import expr
-from wrapper import Wrap
+from wrapper import *
 import sys
 
 src = sys.argv[1]
@@ -13,7 +13,8 @@ vrs,unused = expr.splitByUsing(e,envs,vrs)
 print('UNUSED:', unused)
 envs = expr.makeTbl(e,vrs)
 
-wrap = Wrap('./combinator.so')
+#wrap = CPPWrap('./combinator.so')
+wrap = RustWrap('./libsolver.so')
 analog = wrap.findAnalog([t['!'] for t in envs], len(vrs), 1000, int(len(vrs) * 2.5))
 if analog is None:
     print('not found')
