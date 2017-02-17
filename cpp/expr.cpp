@@ -1,4 +1,5 @@
 #include "expr.h"
+#include <iostream>
 
 /*
  * void  init_funs();
@@ -72,7 +73,7 @@ extern "C" void init_funs() {
 	fun_names[3] = "!=";
 }
 
-inline static void expr_str(Expr* expr, string &out) {
+inline static void expr_str(Expr* expr, Expr** tbl, string &out) {
 	out.clear();
 	stringstream ss;
 	vector<Expr*> stack;
@@ -92,6 +93,15 @@ inline static void expr_str(Expr* expr, string &out) {
 				ss << "BIN " << fun_names[expr -> bin_call.opr] << " ";
 				stack.push_back(expr -> bin_call.left);
 				stack.push_back(expr -> bin_call.right);
+			break;
+			case NOT_T:
+				ss << "NOT_T ";
+				stack.push_back(tbl[expr -> not_t]);
+			break;
+			case BIN_T:
+				ss << "BIN_T " << fun_names[expr -> bin_t.opr] << " ";
+				stack.push_back(tbl[expr -> bin_t.left]);
+				stack.push_back(tbl[expr -> bin_t.right]);
 			break;
 		} 
 	}
@@ -116,13 +126,20 @@ static string show_expr_rec(Expr* e) {
 			o = fun_names[e -> bin_call.opr];
 			ss << "(" << a << " " << o << " " << b << ")";
 			break;
+		default:
+			throw 0;
 	}
 	return ss.str();
 }
 
 extern "C" const char* show_expr(Expr* e, Table* t) {
 	//expr_str(e, t -> res_str);
-	t -> res_str = show_expr_rec(e);
+	try {
+		t -> res_str = show_expr_rec(e);
+	} catch(...) {
+		cerr << "ERR CANT USE TABLE FUNS HERE" << endl;
+		t -> res_str = "";
+	}
 	return t -> res_str.c_str();
 }
 
@@ -221,9 +238,9 @@ Expr* e_bin(int op, int a, int b) {
 	return e;
 }
 
-string log_expr(Expr* e) {
+string log_expr(Expr* e, Expr** tbl) {
 	string res;
-	expr_str(e, res);
+	expr_str(e, tbl, res);
 	return res;
 }
 

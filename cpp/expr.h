@@ -30,6 +30,8 @@ struct Expr {
 	};
 	char type; //          - field type
 	char depth; //         - field depth
+	int  pos_in_vec;
+	int  hash;
 };
 
 struct Table {
@@ -56,8 +58,8 @@ Expr*        e_var(int);
 Expr*        e_not(Expr*);
 Expr*        e_bin(int,Expr*,Expr*);
 Expr*        e_bin_t(int,int,int);
-Expr*        e_not(int);
+Expr*        e_not_t(int);
 bool         eval(Expr*, Env*, Expr**);
 Expr*        clone_expr(Expr*, Expr**);
 EnvSet*      gen_env_set(int var_count);
-std::string  log_expr(Expr* e);
+std::string  log_expr(Expr* e, Expr**);

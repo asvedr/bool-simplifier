@@ -7,7 +7,7 @@ class Wrap:
         ffi.cdef('void*        new_state(int*, int);')
         ffi.cdef('void         delete_state(void*);')
         ffi.cdef('void*        find_analog(void*,int,int);')
-        ffi.cdef('int          expr_depth(void*);')
+        ffi.cdef('int          expr_depth(void*,void*);')
         ffi.cdef('const char*  show_expr(void*, void*);') # (expr, tbl)
         ffi.cdef('void         delete_expr(void*);')
         self._lib = ffi.dlopen(path)
