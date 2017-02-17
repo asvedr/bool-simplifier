@@ -1,5 +1,6 @@
 target
 Cargo.lock
+rust/target/*
 *.o
 *.swp
 *.swo
