@@ -28,21 +28,28 @@ pub fn find_analog(req : Request, iter_count : usize, max_depth : usize) -> Opti
     let mut index_tbl : HashMap<usize,usize> = HashMap::new();
     hash_tbl.reserve(usize::pow(2, req.var_count as u32));
     index_tbl.reserve(usize::pow(2, req.var_count as u32));
+    //let mut seq_s : Vec<Vec<RExpr>> = vec![];
+    //for _ in 0 .. req.var_count {
+    //    seq_s.push(Vec::new());
+    //}
     let mut seq : Vec<RExpr> = Vec::new();
     // making start samples
-    for i in 0 .. req.var_count {
-        let e = Expr::var(i);
-        seq.push(e.clone());
-        let e = Expr::not(e);
-        seq.push(e.clone());
+    {
+        //let seq = &mut seq_s[0];
+        for i in 0 .. req.var_count {
+            let e = Expr::var(i);
+            seq.push(e.clone());
+            let e = Expr::not(e);
+            seq.push(e.clone());
+        }
     }
     let envs = gen_envs(req.var_count);
     let mut hash : usize = 0;
     let mut is_tautology : bool = false;
     let mut answer = None;
     macro_rules! try_this{($e:expr) => {{
-        $e.hash(&envs, None, &mut hash, &mut is_tautology);
-        let depth = $e.depth(Some(&hash_tbl));
+        $e.hash(&envs, &mut hash, &mut is_tautology);
+        let depth = $e.depth();
         if (is_tautology || depth > max_depth) && hash != req.hash {
             continue;
         } else {
@@ -54,7 +61,7 @@ pub fn find_analog(req : Request, iter_count : usize, max_depth : usize) -> Opti
                     new = false;
                     ind = **i;
                     // REPLACE
-                    if depth < seq[ind].depth(Some(&hash_tbl)) {
+                    if depth < seq[ind].depth() {
                         seq[ind] = $e.clone();
                         hash_tbl.insert(hash, $e.clone());
                     }
@@ -80,7 +87,7 @@ pub fn find_analog(req : Request, iter_count : usize, max_depth : usize) -> Opti
             let mut i;
             loop {
                 i = random::<usize>() % len;
-                if !seq[i].is_not(Some(&hash_tbl)) {
+                if !seq[i].is_not() {
                     break
                 }
             }
